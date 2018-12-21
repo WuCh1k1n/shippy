@@ -14,12 +14,13 @@ const (
 	port = ":50051"
 )
 
-// IRepository: 存储库接口
+// IRepository - 存储库接口
 type IRepository interface {
 	Create(*pb.Consignment) (*pb.Consignment, error)
+	GetAll() []*pb.Consignment
 }
 
-// Repository: 虚拟存储库，模拟数据存储的使用，以后会用一个真正的实现来替换
+// Repository - 虚拟存储库，模拟数据存储的使用，以后会用一个真正的实现来替换
 type Repository struct {
 	consignments []*pb.Consignment
 }
@@ -29,6 +30,10 @@ func (repo *Repository) Create(consignment *pb.Consignment) (*pb.Consignment, er
 	return consignment, nil
 }
 
+func (repo *Repository) GetAll() []*pb.Consignment {
+	return repo.consignments
+}
+
 // service 实现所有方法以满足我们在protobuf定义中定义的服务。
 // service 实现 consignment.pb.go 中的 ShippingServiceServer 接口
 // 可以去 consignment.pb.go 中寻找对应方法的签名以更好地实现它们
@@ -36,7 +41,8 @@ type service struct {
 	repo IRepository
 }
 
-// CreateConsignment: 我们服务中的一个方法
+// CreateConsignment - 我们 rpc 服务中的一个方法
+// 实现 ShippingServiceServer 接口
 func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment) (*pb.Response, error) {
 
 	consignment, err := s.repo.Create(req)
@@ -45,6 +51,11 @@ func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment) (*
 	}
 
 	return &pb.Response{Created: true, Consignment: consignment}, nil
+}
+
+func (s *service) GetConsignments(ctx context.Context, req *pb.GetRequest) (*pb.Response, error) {
+	consignments := s.repo.GetAll()
+	return &pb.Response{Consignments: consignments}, nil
 }
 
 func main() {
