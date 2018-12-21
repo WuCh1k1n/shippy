@@ -2,6 +2,7 @@
 package main
 
 import (
+	"github.com/micro/go-micro/cmd"
 	"context"
 	"encoding/json"
 	"io/ioutil"
@@ -9,11 +10,10 @@ import (
 	"os"
 
 	pb "com.fengberlin/shippy/consignment-service/proto/consignment"
-	"google.golang.org/grpc"
+	microclient "github.com/micro/go-micro/client"
 )
 
 const (
-	address         = "localhost:50051"
 	defaultFilename = "consignment.json"
 )
 
@@ -30,15 +30,11 @@ func parseFile(filename string) (*pb.Consignment, error) {
 }
 
 func main() {
-	// 建立与gPRC server的连接
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("Did not connect: %v\n", err)
-	}
-	defer conn.Close()
 
-	// 建立gRPC client
-	client := pb.NewShippingServiceClient(conn)
+	cmd.Init()
+
+	// 创建 client
+	client := pb.NewShippingServiceClient("go.micro.srv.consignment", microclient.DefaultClient)
 
 	filename := defaultFilename
 	if len(os.Args) > 1 {

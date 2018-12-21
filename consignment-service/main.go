@@ -1,17 +1,12 @@
 package main
 
 import (
-	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc"
 	"context"
 	"log"
-	"net"
+
+	micro "github.com/micro/go-micro"
 
 	pb "com.fengberlin/shippy/consignment-service/proto/consignment"
-)
-
-const (
-	port = ":50051"
 )
 
 // IRepository - 存储库接口
@@ -43,39 +38,46 @@ type service struct {
 
 // CreateConsignment - 我们 rpc 服务中的一个方法
 // 实现 ShippingServiceServer 接口
-func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment) (*pb.Response, error) {
+// 使用grpc生成出来的函数签名：func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment) (*pb.Response, error)
+
+// 下面是使用go micro插件生成出来的新代码，这消除了样板式代码
+// 这次实现的是 ShippingServiceHandler 接口
+func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment, resp *pb.Response) error {
 
 	consignment, err := s.repo.Create(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	return &pb.Response{Created: true, Consignment: consignment}, nil
+	resp.Created = true
+	resp.Consignment = consignment
+	return nil
 }
 
-func (s *service) GetConsignments(ctx context.Context, req *pb.GetRequest) (*pb.Response, error) {
+func (s *service) GetConsignments(ctx context.Context, req *pb.GetRequest, resp *pb.Response) error {
 	consignments := s.repo.GetAll()
-	return &pb.Response{Consignments: consignments}, nil
+	resp.Consignments = consignments
+	return nil
 }
 
 func main() {
 
 	repo := &Repository{}
 
-	// 建立一个gRPC server
-	listener, err := net.Listen("tcp", port)
-	if err != nil {
-		log.Fatalf("failed to listen: %v\n", err)
-	}
+	// 创建一个新服务，其中可以包括一些可选的配置
+	srv := micro.NewService(
+		// 这个 Name 必须和 consignment.proto 中的 package 一致
+		micro.Name("go.micro.srv.consignment"),
+		micro.Version("latest"),
+	)
 
-	s := grpc.NewServer()
+	// Init 会解析命令行参数
+	srv.Init()
 
-	// 向 gPRC server 注册服务
-	pb.RegisterShippingServiceServer(s, &service{repo})
+	// 注册 handler，相当于是之前的 gRPC server
+	// 第二个参数需要传入实现了 ShippingServiceHandler 接口的对象
+	pb.RegisterShippingServiceHandler(srv.Server(), &service{repo})
 
-	// 在gRPC服务器上注册反射服务
-	reflection.Register(s)
-	if err := s.Serve(listener); err != nil {
-		log.Fatalf("failed to serve: %v\n", err)
+	if err := srv.Run(); err != nil {
+		log.Println(err)
 	}
 }
