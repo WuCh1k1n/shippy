@@ -2,12 +2,14 @@
 package main
 
 import (
-	"github.com/micro/go-micro/cmd"
 	"context"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/micro/go-micro/cmd"
+	"github.com/micro/go-micro/metadata"
 
 	pb "com.fengberlin/shippy/consignment-service/proto/consignment"
 	microclient "github.com/micro/go-micro/client"
@@ -37,23 +39,32 @@ func main() {
 	client := pb.NewShippingServiceClient("go.micro.srv.consignment", microclient.DefaultClient)
 
 	filename := defaultFilename
-	if len(os.Args) > 1 {
-		filename = os.Args[1]
+	if len(os.Args) < 3 {
+		log.Fatalln("Not enough arguments, expecing file and token.")
 	}
+	filename = os.Args[1]
+
+	token := os.Args[2]
 
 	consignment, err := parseFile(filename)
 	if err != nil {
 		log.Fatalf("Could not parse file: %v\n", err)
 	}
 
-	r, err := client.CreateConsignment(context.Background(), consignment)
+	// 创建带有用户 token 的 context
+	// consignment-service 服务端将从中取出 token，解密取出用户身份
+	tokenContext := metadata.NewContext(context.Background(), map[string]string{
+		"token": token,
+	})
+
+	r, err := client.CreateConsignment(tokenContext, consignment)
 	if err != nil {
 		log.Fatalf("create consignment error: %v\n", err)
 	}
 	// 是否成功创建consignment
 	log.Printf("Created: %t", r.Created)
 
-	getAll, err := client.GetConsignments(context.Background(), &pb.GetRequest{})
+	getAll, err := client.GetConsignments(tokenContext, &pb.GetRequest{})
 	if err != nil {
 		log.Fatalf("failed to list consignments: %v\n", err)
 	}
