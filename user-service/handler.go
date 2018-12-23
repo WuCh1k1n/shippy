@@ -1,15 +1,17 @@
 package main
 
 import (
-	"golang.org/x/crypto/bcrypt"
 	"context"
+	"errors"
 	"log"
+
+	"golang.org/x/crypto/bcrypt"
 
 	pb "com.fengberlin/shippy/user-service/proto/user"
 )
 
 type service struct {
-	repo Repository
+	repo         Repository
 	tokenService Authable
 }
 
@@ -65,7 +67,7 @@ func (srv *service) Create(ctx context.Context, req *pb.User, resp *pb.Response)
 		return err
 	}
 	req.Password = string(hashedPwd)
-	
+
 	if err := srv.repo.Create(req); err != nil {
 		return err
 	}
@@ -76,5 +78,15 @@ func (srv *service) Create(ctx context.Context, req *pb.User, resp *pb.Response)
 
 func (srv *service) ValidateToken(ctx context.Context, req *pb.Token, resp *pb.Token) error {
 
+	claims, err := srv.tokenService.Decode(req.Token)
+	if err != nil {
+		return err
+	}
+
+	if claims.User.Id == "" {
+		return errors.New("invalid user")
+	}
+
+	resp.Valid = true
 	return nil
 }

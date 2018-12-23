@@ -6,8 +6,6 @@ import (
 	"os"
 
 	pb "com.fengberlin/shippy/user-service/proto/user"
-	"github.com/micro/cli"
-	micro "github.com/micro/go-micro"
 	microclient "github.com/micro/go-micro/client"
 	"github.com/micro/go-micro/cmd"
 )
@@ -19,60 +17,39 @@ func main() {
 	// 创建 user-service 客户端
 	client := pb.NewUserServiceClient("go.micro.srv.user", microclient.DefaultClient)
 
-	// 在这里，我们使用了go-micro的命令行助手，这非常简洁
-	service := micro.NewService(
-		micro.Flags(
-			cli.StringFlag{
-				Name:  "name",
-				Usage: "Your full name",
-			},
-			cli.StringFlag{
-				Name:  "email",
-				Usage: "Your email",
-			},
-			cli.StringFlag{
-				Name:  "password",
-				Usage: "Your password",
-			},
-			cli.StringFlag{
-				Name:  "company",
-				Usage: "Your company",
-			},
-		),
-	)
+	// 暂时将用户信息写死在代码中
+	name := "Ewan Valentine"
+	email := "ewan.valentine89@gmail.com"
+	password := "test123"
+	company := "BBC"
 
-	service.Init(
-		micro.Action(func(c *cli.Context) {
-
-			name := c.String("name")
-			email := c.String("email")
-			password := c.String("password")
-			company := c.String("company")
-
-			resp, err := client.Create(context.Background(), &pb.User{
-				Name:     name,
-				Email:    email,
-				Password: password,
-				Company:  company,
-			})
-			if err != nil {
-				log.Fatalf("Could not create: %v", err)
-			}
-			log.Printf("Created: %s", resp.User.Id)
-
-			getAll, err := client.GetAll(context.Background(), &pb.Request{})
-			if err != nil {
-				log.Fatalf("Could not list users: %v", err)
-			}
-			for _, user := range getAll.Users {
-				log.Println(user)
-			}
-
-			os.Exit(0)
-		}),
-	)
-
-	if err := service.Run(); err != nil {
-		log.Println(err)
+	resp, err := client.Create(context.Background(), &pb.User{
+		Name:     name,
+		Email:    email,
+		Password: password,
+		Company:  company,
+	})
+	if err != nil {
+		log.Fatalf("call Create method error: %v\n", err)
 	}
+	log.Println("user created: ", resp.User.Id)
+
+	allResp, err := client.GetAll(context.Background(), &pb.Request{})
+	if err != nil {
+		log.Fatalf("call GetAll method error: %v", err)
+	}
+	for i, u := range allResp.Users {
+		log.Printf("user_%d: %v\n", i, u)
+	}
+
+	authResp, err := client.Auth(context.Background(), &pb.User{
+		Email:    email,
+		Password: password,
+	})
+	if err != nil {
+		log.Fatalf("auth failed: %v\n", err)
+	}
+	log.Println("token: ", authResp.Token)
+
+	os.Exit(0)
 }

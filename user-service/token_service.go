@@ -1,18 +1,59 @@
 package main
 
+import (
+	"time"
+
+	pb "com.fengberlin/shippy/user-service/proto/user"
+	jwt "github.com/dgrijalva/jwt-go"
+)
+
 type Authable interface {
-	Decode(token string) (interface{}, error)
-	Encode(data interface{}) (string, error)
+	Decode(tokenStr string) (*CustomClaims, error)
+	Encode(user *pb.User) (string, error)
+}
+
+// 定义加盐哈希密码时所用的盐
+// 要保证其生成和保存都足够安全
+// 比如使用 md5 来生成
+var privateKey = []byte("`sdja82,./&&*9")
+
+// 自定义的 metadata
+// 在加密后作为 JWT 的第二部分返回给客户端
+type CustomClaims struct {
+	User *pb.User
+	jwt.StandardClaims
 }
 
 type TokenService struct {
 	repo Repository
 }
 
-func (srv *TokenService) Decode(token string) (interface{}, error) {
-	return "", nil
+// // 将 JWT 字符串解密为 CustomClaims 对象
+func (srv *TokenService) Decode(tokenStr string) (*CustomClaims, error) {
+
+	token, err := jwt.ParseWithClaims(tokenStr, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return privateKey, nil
+	})
+
+	// 解密转换类型并返回
+	if claims, ok := token.Claims.(*CustomClaims); ok && token.Valid {
+		return claims, nil
+	} else {
+		return nil, err
+	}
 }
 
-func (srv *TokenService) Encode(data interface{}) (string, error) {
-	return "", nil
+// 将 User 用户信息加密为 JWT 字符串
+func (srv *TokenService) Encode(user *pb.User) (string, error) {
+
+	expireTime := time.Now().Add(time.Hour * 24 * 3).Unix()
+	claims := CustomClaims{
+		user,
+		jwt.StandardClaims{
+			Issuer: "go.micro.srv.user",
+			ExpiresAt: expireTime,
+		},
+	}
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return jwtToken.SignedString(privateKey)
 }
