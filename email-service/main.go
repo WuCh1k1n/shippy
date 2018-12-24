@@ -1,16 +1,16 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"log"
-
-	"github.com/micro/go-micro/broker"
 
 	userPb "com.fengberlin/shippy/user-service/proto/user"
 	micro "github.com/micro/go-micro"
 )
 
 const topic = "user.created"
+
+type Subscriber struct{}
 
 func main() {
 
@@ -21,24 +21,7 @@ func main() {
 
 	srv.Init()
 
-	pubSub := srv.Server().Options().Broker
-	if err := pubSub.Connect(); err != nil {
-		log.Fatalf("broker connect error: %v\n", err)
-	}
-
-	// 订阅消息
-	_, err := pubSub.Subscribe(topic, func(pub broker.Publication) error {
-		var user *userPb.User
-		if err := json.Unmarshal(pub.Message().Body, &user); err != nil {
-			return err
-		}
-		log.Printf("[Create User]: %v\n", user)
-		go sendEmail(user)
-		return nil
-	})
-	if err != nil {
-		log.Printf("sub error: %v\n", err)
-	}
+	micro.RegisterSubscriber(topic, srv.Server(), new(Subscriber))
 
 	if err := srv.Run(); err != nil {
 		log.Fatalf("srv run error: %v\n", err)
@@ -47,5 +30,12 @@ func main() {
 
 func sendEmail(user *userPb.User) error {
 	log.Printf("[SENDING A EMAIL TO %s...]", user.Name)
+	return nil
+}
+
+func (s *Subscriber) Process(ctx context.Context, user *userPb.User) error {
+
+	log.Println("[Picked up a new message]")
+	log.Println("[Sending email to]:", user.Name)
 	return nil
 }

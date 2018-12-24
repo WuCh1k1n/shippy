@@ -8,6 +8,8 @@ import (
 	pb "com.fengberlin/shippy/user-service/proto/user"
 )
 
+const topic = "user.created"
+
 func main() {
 
 	db, err := CreateConnection()
@@ -32,9 +34,9 @@ func main() {
 	srv.Init()
 
 	// 获取 broker 实例
-	pubSub := srv.Server().Options().Broker
+	publisher := micro.NewPublisher(topic, srv.Client())
 
-	pb.RegisterUserServiceHandler(srv.Server(), &service{repo, tokenService, pubSub})
+	pb.RegisterUserServiceHandler(srv.Server(), &service{repo, tokenService, publisher})
 
 	if err := srv.Run(); err != nil {
 		log.Println(err)
