@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 
+	"github.com/micro/go-micro/broker"
+
+	_ "github.com/micro/go-plugins/broker/nats"
 	"golang.org/x/crypto/bcrypt"
 
 	pb "com.fengberlin/shippy/user-service/proto/user"
@@ -13,6 +17,7 @@ import (
 type service struct {
 	repo         Repository
 	tokenService Authable
+	pubSub       broker.Broker
 }
 
 func (srv *service) Get(ctx context.Context, req *pb.User, resp *pb.Response) error {
@@ -73,6 +78,36 @@ func (srv *service) Create(ctx context.Context, req *pb.User, resp *pb.Response)
 	}
 
 	resp.User = req
+
+	if err := srv.publishEvent(req); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+const topic = "user.created"
+
+// 发布消息
+func (srv *service) publishEvent(user *pb.User) error {
+
+	body, err := json.Marshal(user)
+	if err != nil {
+		return err
+	}
+
+	msg := &broker.Message{
+		Header: map[string]string{
+			"id": user.Id,
+		},
+		Body: body,
+	}
+
+	// 发布 user.created topic 消息
+	if err := srv.pubSub.Publish(topic, msg); err != nil {
+		log.Fatalf("[pub] failed: %v\n", err)
+	}
+
 	return nil
 }
 
