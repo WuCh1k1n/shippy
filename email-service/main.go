@@ -28,11 +28,6 @@ func main() {
 	}
 }
 
-func sendEmail(user *userPb.User) error {
-	log.Printf("[SENDING A EMAIL TO %s...]", user.Name)
-	return nil
-}
-
 func (s *Subscriber) Process(ctx context.Context, user *userPb.User) error {
 
 	log.Println("[Picked up a new message]")
